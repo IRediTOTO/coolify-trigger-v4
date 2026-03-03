@@ -5,6 +5,8 @@ services:
     image: 'ghcr.io/triggerdotdev/trigger.dev:v4.2.0'
     restart: unless-stopped
     depends_on:
+      - postgres
+      - redis
       - clickhouse
       - electric
       - minio
@@ -59,11 +61,46 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+  postgres:
+    networks:
+      - trigger-net
+    image: postgres:14
+    restart: unless-stopped
+    command:
+      - -c
+      - wal_level=logical
+    environment:
+      POSTGRES_USER: 'postgres'
+      POSTGRES_PASSWORD: '${SERVICE_PASSWORD_POSTGRES}'
+      POSTGRES_DB: '${POSTGRES_DB:-trigger}'
+    volumes:
+      - 'postgres-data:/var/lib/postgresql/data'
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+      start_period: 10s
+  redis:
+    networks:
+      - trigger-net
+    image: 'redis:7'
+    restart: unless-stopped
+    volumes:
+      - 'redis-data:/data'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
   electric:
     networks:
       - trigger-net
     image: 'electricsql/electric:1.0.24'
     restart: unless-stopped
+    depends_on:
+      - postgres
     environment:
       DATABASE_URL: 'postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-trigger}?schema=public&sslmode=disable'
       ELECTRIC_INSECURE: 'true'
@@ -133,10 +170,8 @@ services:
     image: 'ghcr.io/triggerdotdev/supervisor:v4-beta'
     restart: unless-stopped
     depends_on:
-      docker-proxy:
-        condition: service_healthy
-      trigger:
-        condition: service_healthy
+      - docker-proxy
+      - trigger
     user: root
     command: "sh -c \"chown -R node:node /home/node/shared && exec /usr/bin/dumb-init -- pnpm run --filter supervisor start\"\n"
     environment:
@@ -184,6 +219,8 @@ services:
       retries: 5
       start_period: 5s
 volumes:
+  postgres-data:
+  redis-data:
   clickhouse-data:
   minio-data:
   shared-data:
