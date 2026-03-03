@@ -5,8 +5,6 @@ services:
     image: 'ghcr.io/triggerdotdev/trigger.dev:v4.2.0'
     restart: unless-stopped
     depends_on:
-      - postgres
-      - redis
       - clickhouse
       - electric
       - minio
@@ -22,11 +20,11 @@ services:
       MAGIC_LINK_SECRET: '${SERVICE_PASSWORD_MAGIC}'
       ENCRYPTION_KEY: '${SERVICE_PASSWORD_ENCRYPTION}'
       MANAGED_WORKER_SECRET: '${SERVICE_PASSWORD_MANAGEDWORKER}'
-      DATABASE_URL: 'postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-trigger}?schema=public&sslmode=disable'
-      DIRECT_URL: 'postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-trigger}?schema=public&sslmode=disable'
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_TLS_DISABLED: true
+      DATABASE_URL: '${DATABASE_URL}'
+      DIRECT_URL: '${DIRECT_URL:-${DATABASE_URL}}'
+      REDIS_HOST: '${REDIS_HOST}'
+      REDIS_PORT: '${REDIS_PORT:-6379}'
+      REDIS_TLS_DISABLED: '${REDIS_TLS_DISABLED:-true}'
       ELECTRIC_ORIGIN: 'http://electric:3000'
       DEV_OTEL_EXPORTER_OTLP_ENDPOINT: '${SERVICE_URL_TRIGGER}/otel'
       DEPLOY_REGISTRY_HOST: '${SERVICE_FQDN_REGISTRY}'
@@ -61,48 +59,13 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-  postgres:
-    networks:
-      - trigger-net
-    image: postgres:14
-    restart: unless-stopped
-    command:
-      - -c
-      - wal_level=logical
-    environment:
-      POSTGRES_USER: 'postgres'
-      POSTGRES_PASSWORD: '${SERVICE_PASSWORD_POSTGRES}'
-      POSTGRES_DB: '${POSTGRES_DB:-trigger}'
-    volumes:
-      - 'postgres-data:/var/lib/postgresql/data'
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
-      interval: 5s
-      timeout: 20s
-      retries: 10
-      start_period: 10s
-  redis:
-    networks:
-      - trigger-net
-    image: 'redis:7'
-    restart: unless-stopped
-    volumes:
-      - 'redis-data:/data'
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
   electric:
     networks:
       - trigger-net
     image: 'electricsql/electric:1.0.24'
     restart: unless-stopped
-    depends_on:
-      - postgres
     environment:
-      DATABASE_URL: 'postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-trigger}?schema=public&sslmode=disable'
+      DATABASE_URL: '${DATABASE_URL}'
       ELECTRIC_INSECURE: 'true'
       ELECTRIC_USAGE_REPORTING: 'false'
     healthcheck:
@@ -221,8 +184,6 @@ services:
       retries: 5
       start_period: 5s
 volumes:
-  postgres-data:
-  redis-data:
   clickhouse-data:
   minio-data:
   shared-data:
