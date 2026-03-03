@@ -5,10 +5,14 @@ services:
     image: 'ghcr.io/triggerdotdev/trigger.dev:v4.2.0'
     restart: unless-stopped
     depends_on:
-      - clickhouse
-      - electric
-      - minio
-      - registry
+      clickhouse:
+        condition: service_healthy
+      electric:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      registry:
+        condition: service_healthy
     user: root
     command: "sh -c \"chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh\"\n"
     environment:
@@ -48,7 +52,7 @@ services:
       RUN_REPLICATION_CLICKHOUSE_URL: 'http://${CLICKHOUSE_ADMIN_USER:-default}:${SERVICE_PASSWORD_64_CLICKHOUSE}@clickhouse:8123'
       RUN_REPLICATION_LOG_LEVEL: info
       APP_LOG_LEVEL: info
-      TRIGGER_TELEMETRY_DISABLED: 0
+      TRIGGER_TELEMETRY_DISABLED: 1
     volumes:
       - 'shared-data:/home/node/shared'
     healthcheck:
@@ -59,8 +63,8 @@ services:
         - "require('http').get('http://127.0.0.1:3000/healthcheck',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
   electric:
     networks:
       - trigger-net
