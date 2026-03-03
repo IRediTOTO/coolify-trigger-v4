@@ -71,7 +71,7 @@ services:
     image: 'electricsql/electric:1.0.24'
     restart: unless-stopped
     environment:
-      DATABASE_URL: '${DATABASE_URL}'
+      DATABASE_URL: '${DIRECT_URL}'
       ELECTRIC_INSECURE: 'true'
       ELECTRIC_USAGE_REPORTING: 'false'
     healthcheck:
